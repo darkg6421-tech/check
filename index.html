@@ -1,0 +1,755 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
+    
+    <!-- Strict CSP to prevent XSS -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self';">
+    
+    <title>CipherVault Pro · Zero-Knowledge Password Manager</title>
+    
+    <!-- Favicon / PWA -->
+    <link rel="manifest" href="data:application/manifest+json,{name:'CipherVault Pro',short_name:'CipherVault',display:'standalone',background_color:'%230f172a',theme_color:'%2338bdf8'}">
+    <meta name="theme-color" content="#38bdf8">
+    
+    <style>
+        /* ========== CSS VARIABLES (DARK MODE DEFAULT) ========== */
+        :root {
+            --bg-gradient: linear-gradient(145deg, #0f172a 0%, #1e293b 100%);
+            --card-bg: rgba(30, 41, 59, 0.85);
+            --text-primary: #e2e8f0;
+            --text-secondary: #94a3b8;
+            --input-bg: #0f172a;
+            --input-border: #334155;
+            --btn-primary: linear-gradient(135deg, #38bdf8, #3b82f6);
+            --btn-outline-bg: transparent;
+            --btn-outline-border: #475569;
+            --accent-color: #38bdf8;
+            --danger-bg: #7f1d1d;
+            --success-color: #10b981;
+            --modal-overlay: rgba(0,0,0,0.7);
+        }
+        .light-mode {
+            --bg-gradient: linear-gradient(145deg, #f8fafc 0%, #e2e8f0 100%);
+            --card-bg: rgba(255, 255, 255, 0.9);
+            --text-primary: #1e293b;
+            --text-secondary: #475569;
+            --input-bg: #ffffff;
+            --input-border: #cbd5e1;
+            --btn-primary: linear-gradient(135deg, #2563eb, #1d4ed8);
+            --btn-outline-bg: transparent;
+            --btn-outline-border: #94a3b8;
+            --accent-color: #2563eb;
+            --danger-bg: #dc2626;
+            --success-color: #059669;
+            --modal-overlay: rgba(0,0,0,0.4);
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: var(--bg-gradient);
+            min-height: 100vh;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            color: var(--text-primary);
+            padding: 16px;
+            transition: background 0.3s;
+        }
+        .container { max-width: 550px; margin: 0 auto; }
+        
+        /* Header */
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 24px;
+        }
+        .logo {
+            font-size: 26px;
+            font-weight: 700;
+            background: linear-gradient(135deg, #38bdf8, #a78bfa);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+        .header-actions { display: flex; gap: 12px; }
+        .icon-btn {
+            background: var(--card-bg);
+            border: 1px solid var(--input-border);
+            color: var(--text-primary);
+            width: 40px; height: 40px;
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer; font-size: 18px;
+            backdrop-filter: blur(8px);
+        }
+        .lock-status {
+            display: flex; align-items: center; gap: 6px;
+            font-size: 14px; color: var(--text-secondary);
+        }
+
+        /* Cards */
+        .card {
+            background: var(--card-bg);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--input-border);
+            border-radius: 24px; padding: 24px; margin-bottom: 20px;
+            box-shadow: 0 20px 35px -8px rgba(0,0,0,0.3);
+        }
+
+        /* Inputs */
+        .input-group { margin-bottom: 18px; position: relative; }
+        label {
+            display: block; font-size: 13px; font-weight: 500;
+            color: var(--text-secondary); margin-bottom: 6px;
+            text-transform: uppercase; letter-spacing: 0.5px;
+        }
+        input, textarea {
+            width: 100%; padding: 14px 16px;
+            background: var(--input-bg); border: 1.5px solid var(--input-border);
+            border-radius: 16px; color: var(--text-primary); font-size: 16px;
+            transition: all 0.2s;
+        }
+        input:focus, textarea:focus {
+            border-color: var(--accent-color); outline: none;
+            box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.2);
+        }
+        .password-toggle {
+            position: absolute; right: 16px; top: 38px;
+            cursor: pointer; opacity: 0.7; user-select: none;
+        }
+
+        /* Buttons */
+        .btn {
+            background: var(--btn-primary); color: white; border: none;
+            padding: 14px 20px; border-radius: 40px; font-weight: 600;
+            font-size: 16px; cursor: pointer; width: 100%; transition: all 0.2s;
+        }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-outline {
+            background: var(--btn-outline-bg);
+            border: 1.5px solid var(--btn-outline-border);
+            color: var(--text-primary);
+        }
+        .flex-row { display: flex; gap: 10px; }
+
+        /* Password List */
+        .search-box { margin-bottom: 16px; }
+        .password-item {
+            background: var(--input-bg); border-radius: 16px; padding: 16px;
+            margin-bottom: 10px; border-left: 4px solid var(--accent-color);
+        }
+        .password-title { font-weight: 600; margin-bottom: 4px; }
+        .password-detail {
+            font-size: 13px; color: var(--text-secondary);
+            display: flex; gap: 16px;
+        }
+        .item-actions { display: flex; gap: 8px; margin-top: 12px; }
+        .copy-btn {
+            background: var(--input-border); border: none;
+            color: var(--text-primary); padding: 8px 12px;
+            border-radius: 20px; font-size: 12px; cursor: pointer; font-weight: 500;
+        }
+
+        /* Strength Meter */
+        .strength-meter { height: 6px; background: var(--input-border); border-radius: 10px; margin-top: 8px; }
+        .strength-fill { height: 6px; border-radius: 10px; width: 0%; transition: width 0.2s; }
+        .weak { background: #ef4444; width: 25%; }
+        .medium { background: #f59e0b; width: 50%; }
+        .strong { background: #10b981; width: 75%; }
+        .very-strong { background: #38bdf8; width: 100%; }
+
+        /* Toast & Loading Spinner */
+        #toast {
+            position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
+            background: #1e293b; color: white; padding: 12px 24px;
+            border-radius: 40px; font-weight: 500; opacity: 0;
+            transition: opacity 0.3s; pointer-events: none; z-index: 1000;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.3);
+        }
+        #toast.show { opacity: 1; }
+        .spinner {
+            width: 40px; height: 40px; border: 4px solid var(--input-border);
+            border-top-color: var(--accent-color); border-radius: 50%;
+            animation: spin 0.8s linear infinite; margin: 20px auto;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Modal */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: var(--modal-overlay); display: flex;
+            align-items: center; justify-content: center; z-index: 2000;
+            backdrop-filter: blur(4px);
+        }
+        .modal-card {
+            background: var(--card-bg); max-width: 400px; width: 90%;
+            padding: 24px; border-radius: 24px; border: 1px solid var(--accent-color);
+            box-shadow: 0 25px 40px rgba(0,0,0,0.5); text-align: center;
+        }
+        .modal-icon { font-size: 48px; margin-bottom: 16px; }
+        .modal-title { font-size: 22px; font-weight: 700; margin-bottom: 8px; color: #f87171; }
+        .modal-text { color: var(--text-secondary); margin-bottom: 24px; line-height: 1.5; }
+        .modal-buttons { display: flex; gap: 12px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <div class="logo">🔐 CipherVault Pro</div>
+            <div class="header-actions">
+                <div class="icon-btn" id="themeToggle" title="Toggle Theme">🌙</div>
+                <div class="lock-status" id="lockStatus"><span>🔒</span> Locked</div>
+            </div>
+        </div>
+
+        <!-- Unlock Section -->
+        <div id="unlockSection" class="card">
+            <h2 style="margin-bottom: 20px; font-weight: 500;">Unlock Vault</h2>
+            <div class="input-group">
+                <label>Master Password</label>
+                <input type="password" id="masterPassword" placeholder="Enter your master password" autocomplete="off">
+                <span class="password-toggle" id="toggleMasterPassword">👁️</span>
+            </div>
+            <div class="input-group" id="confirmPasswordGroup" style="display: none;">
+                <label>Confirm Master Password</label>
+                <input type="password" id="confirmMasterPassword" placeholder="Re-enter password" autocomplete="off">
+            </div>
+            <button class="btn" id="unlockBtn">Unlock Vault</button>
+            <div id="unlockSpinner" style="display: none;" class="spinner"></div>
+            <p style="margin-top: 16px; font-size: 13px; color: var(--text-secondary); text-align: center;">
+                PBKDF2 (600k) + AES-256-GCM · Zero-Knowledge
+            </p>
+        </div>
+
+        <!-- Vault Section -->
+        <div id="vaultSection" style="display: none;">
+            <div class="card">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                    <h2 style="font-weight: 500;">Your Passwords</h2>
+                    <button class="copy-btn" id="lockNowBtn">Lock Now</button>
+                </div>
+                <div class="search-box">
+                    <input type="text" id="searchInput" placeholder="🔍 Search passwords..." autocomplete="off">
+                </div>
+                <div id="passwordList"></div>
+                <button class="btn btn-outline" id="addNewBtn" style="margin-top: 16px;">+ Add New Password</button>
+            </div>
+
+            <!-- Add/Edit Form -->
+            <div id="addEditSection" style="display: none;" class="card">
+                <h3 id="formTitle" style="margin-bottom: 20px;">Add New Entry</h3>
+                <input type="hidden" id="editIndex" value="-1">
+                <div class="input-group">
+                    <label>Title</label>
+                    <input type="text" id="entryTitle" placeholder="e.g., Gmail">
+                </div>
+                <div class="input-group">
+                    <label>Username / Email</label>
+                    <input type="text" id="entryUsername" placeholder="user@example.com">
+                </div>
+                <div class="input-group">
+                    <label>Password</label>
+                    <div class="flex-row">
+                        <input type="password" id="entryPassword" placeholder="Password" style="flex:1;">
+                        <button class="copy-btn" id="generatePwBtn" type="button">Generate</button>
+                    </div>
+                    <span class="password-toggle" id="toggleEntryPassword" style="position:static; margin-left:8px;">👁️</span>
+                    <div class="strength-meter"><div class="strength-fill" id="strengthBar"></div></div>
+                </div>
+                <div class="input-group">
+                    <label>Notes (Optional)</label>
+                    <textarea id="entryNotes" rows="2" placeholder="Additional notes..."></textarea>
+                </div>
+                <div class="flex-row">
+                    <button class="btn" id="saveEntryBtn">Save</button>
+                    <button class="btn btn-outline" id="cancelEntryBtn">Cancel</button>
+                </div>
+            </div>
+
+            <!-- Export/Import -->
+            <div class="card">
+                <div class="flex-row">
+                    <button class="btn btn-outline" id="exportBtn">📤 Export Backup</button>
+                    <button class="btn btn-outline" id="importBtn">📥 Import</button>
+                </div>
+                <input type="file" id="importFile" accept=".json" style="display:none;">
+                <p style="margin-top: 12px; font-size: 12px; color: var(--text-secondary);">Encrypted backup · Restore on new device</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Warning Modal -->
+    <div id="warningModal" class="modal-overlay" style="display: none;">
+        <div class="modal-card">
+            <div class="modal-icon">⚠️</div>
+            <div class="modal-title">PERMANENT LOCK WARNING</div>
+            <div class="modal-text">
+                <strong>This master password CANNOT be recovered.</strong><br><br>
+                If you forget or lose this password, <strong>ALL stored data will be PERMANENTLY LOCKED</strong> and become inaccessible forever.<br><br>
+                The developer has no access to your password or data. There is NO "Forgot Password" option.<br><br>
+                Are you absolutely sure you want to proceed?
+            </div>
+            <div class="modal-buttons">
+                <button class="btn" id="confirmWarningBtn" style="background: #dc2626;">I Understand, Proceed</button>
+                <button class="btn btn-outline" id="cancelWarningBtn">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div id="toast">Copied to clipboard</div>
+
+    <script>
+        (function(){
+            "use strict";
+
+            // ==================== CONFIG ====================
+            const PBKDF2_ITERATIONS = 600000;
+            const SALT_LENGTH = 16;
+            const IV_LENGTH = 12;
+            const AUTO_LOCK_TIME = 30000; // 30 seconds
+            const STORAGE_VERSION = 2;
+            const DB_NAME = 'CipherVaultDB';
+            const STORE_NAME = 'vault';
+            
+            // State
+            let masterKey = null;
+            let vaultData = [];
+            let storageSalt = null;
+            let isUnlocked = false;
+            let lockTimer = null;
+            let currentTheme = 'dark';
+            let pendingMasterPassword = null;
+            let failedAttempts = 0;
+            let lockoutUntil = null;
+            let db = null;
+
+            // DOM Elements
+            const unlockSection = document.getElementById('unlockSection');
+            const vaultSection = document.getElementById('vaultSection');
+            const addEditSection = document.getElementById('addEditSection');
+            const lockStatus = document.getElementById('lockStatus');
+            const passwordList = document.getElementById('passwordList');
+            const searchInput = document.getElementById('searchInput');
+            const themeToggle = document.getElementById('themeToggle');
+            const toast = document.getElementById('toast');
+            const warningModal = document.getElementById('warningModal');
+            const unlockSpinner = document.getElementById('unlockSpinner');
+            const unlockBtn = document.getElementById('unlockBtn');
+
+            // ==================== INDEXEDDB SETUP ====================
+            async function openDB() {
+                return new Promise((resolve, reject) => {
+                    const request = indexedDB.open(DB_NAME, 1);
+                    request.onerror = () => reject(request.error);
+                    request.onsuccess = () => { db = request.result; resolve(db); };
+                    request.onupgradeneeded = (ev) => {
+                        const db = ev.target.result;
+                        if (!db.objectStoreNames.contains(STORE_NAME)) {
+                            db.createObjectStore(STORE_NAME);
+                        }
+                    };
+                });
+            }
+
+            async function saveToStorage(encryptedVault) {
+                if (!db) await openDB();
+                return new Promise((resolve, reject) => {
+                    const tx = db.transaction(STORE_NAME, 'readwrite');
+                    const store = tx.objectStore(STORE_NAME);
+                    store.put(encryptedVault, 'encrypted');
+                    store.put(arrayBufferToBase64(storageSalt), 'salt');
+                    tx.oncomplete = resolve;
+                    tx.onerror = reject;
+                });
+            }
+
+            async function loadFromStorage() {
+                if (!db) await openDB();
+                return new Promise((resolve, reject) => {
+                    const tx = db.transaction(STORE_NAME, 'readonly');
+                    const store = tx.objectStore(STORE_NAME);
+                    const saltReq = store.get('salt');
+                    const dataReq = store.get('encrypted');
+                    tx.oncomplete = () => {
+                        if (!saltReq.result || !dataReq.result) resolve(null);
+                        else {
+                            storageSalt = base64ToArrayBuffer(saltReq.result);
+                            resolve(dataReq.result);
+                        }
+                    };
+                    tx.onerror = reject;
+                });
+            }
+
+            // ==================== UTILITIES ====================
+            function arrayBufferToBase64(buffer) {
+                return btoa(String.fromCharCode(...new Uint8Array(buffer)));
+            }
+            function base64ToArrayBuffer(base64) {
+                const binary = atob(base64);
+                const bytes = new Uint8Array(binary.length);
+                for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+                return bytes.buffer;
+            }
+            function showToast(msg) {
+                toast.textContent = msg;
+                toast.classList.add('show');
+                setTimeout(() => toast.classList.remove('show'), 2000);
+            }
+            function escapeHtml(text) {
+                const div = document.createElement('div');
+                div.textContent = text;
+                return div.innerHTML;
+            }
+            function resetLockTimer() {
+                if (!isUnlocked) return;
+                clearTimeout(lockTimer);
+                lockTimer = setTimeout(() => { if (isUnlocked) lockVault(true); }, AUTO_LOCK_TIME);
+            }
+            function secureWipe(obj) {
+                for (let key in obj) {
+                    if (typeof obj[key] === 'string') obj[key] = '\0'.repeat(obj[key].length);
+                    else if (typeof obj[key] === 'object') secureWipe(obj[key]);
+                }
+            }
+
+            // ==================== CRYPTO (Secure Random) ====================
+            function generateSecurePassword(length = 20) {
+                const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()_+-=[]{}|;:,.<>?';
+                const randomValues = new Uint32Array(length);
+                crypto.getRandomValues(randomValues);
+                let pwd = '';
+                for (let i = 0; i < length; i++) pwd += chars[randomValues[i] % chars.length];
+                return pwd;
+            }
+
+            async function deriveKey(password, salt) {
+                const enc = new TextEncoder();
+                const keyMaterial = await crypto.subtle.importKey('raw', enc.encode(password), 'PBKDF2', false, ['deriveKey']);
+                return crypto.subtle.deriveKey(
+                    { name: 'PBKDF2', salt, iterations: PBKDF2_ITERATIONS, hash: 'SHA-256' },
+                    keyMaterial, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']
+                );
+            }
+
+            async function encryptData(data, key) {
+                const iv = crypto.getRandomValues(new Uint8Array(IV_LENGTH));
+                const ciphertext = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, new TextEncoder().encode(JSON.stringify(data)));
+                return { version: STORAGE_VERSION, iv: arrayBufferToBase64(iv), data: arrayBufferToBase64(ciphertext) };
+            }
+
+            async function decryptData(encryptedObj, key) {
+                if (!encryptedObj.version || encryptedObj.version !== STORAGE_VERSION) throw new Error('Version mismatch');
+                const iv = base64ToArrayBuffer(encryptedObj.iv);
+                const ciphertext = base64ToArrayBuffer(encryptedObj.data);
+                const decrypted = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: new Uint8Array(iv) }, key, ciphertext);
+                return JSON.parse(new TextDecoder().decode(decrypted));
+            }
+
+            // ==================== VAULT INIT/UNLOCK ====================
+            async function initializeVault(password) {
+                storageSalt = crypto.getRandomValues(new Uint8Array(SALT_LENGTH));
+                masterKey = await deriveKey(password, storageSalt);
+                vaultData = [];
+                const encrypted = await encryptData(vaultData, masterKey);
+                await saveToStorage(encrypted);
+            }
+
+            async function unlockVault(password) {
+                const stored = await loadFromStorage();
+                if (!stored) return false;
+                try {
+                    masterKey = await deriveKey(password, storageSalt);
+                    vaultData = await decryptData(stored, masterKey);
+                    return true;
+                } catch { return false; }
+            }
+
+            async function lockVault(isAuto = false) {
+                if (masterKey) {
+                    secureWipe(vaultData);
+                    vaultData = [];
+                }
+                masterKey = null;
+                isUnlocked = false;
+                unlockSection.style.display = 'block';
+                vaultSection.style.display = 'none';
+                addEditSection.style.display = 'none';
+                lockStatus.innerHTML = '<span>🔒</span> Locked';
+                document.getElementById('masterPassword').value = '';
+                clearTimeout(lockTimer);
+                if (!isAuto) showToast('Vault locked');
+            }
+
+            // ==================== UI RENDERING ====================
+            function renderPasswordList() {
+                const term = searchInput.value.toLowerCase();
+                const filtered = vaultData.filter(e => 
+                    (e.title || '').toLowerCase().includes(term) || 
+                    (e.username || '').toLowerCase().includes(term)
+                );
+                if (filtered.length === 0) {
+                    passwordList.innerHTML = `<p style="color:var(--text-secondary); text-align:center; padding:20px;">No passwords found.</p>`;
+                    return;
+                }
+                let html = '';
+                filtered.forEach((entry) => {
+                    const originalIdx = vaultData.indexOf(entry);
+                    html += `<div class="password-item">
+                        <div class="password-title">${escapeHtml(entry.title) || 'Untitled'}</div>
+                        <div class="password-detail"><span>👤 ${escapeHtml(entry.username) || '—'}</span><span>🔑 ••••••••</span></div>
+                        <div class="item-actions">
+                            <button class="copy-btn" data-action="copy" data-index="${originalIdx}">Copy</button>
+                            <button class="copy-btn" data-action="edit" data-index="${originalIdx}">Edit</button>
+                            <button class="copy-btn" data-action="delete" data-index="${originalIdx}" style="background:var(--danger-bg);">Delete</button>
+                        </div>
+                    </div>`;
+                });
+                passwordList.innerHTML = html;
+                document.querySelectorAll('[data-action]').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        const action = e.target.dataset.action;
+                        const idx = parseInt(e.target.dataset.index);
+                        if (action === 'copy') copyPassword(idx);
+                        else if (action === 'edit') editEntry(idx);
+                        else if (action === 'delete') deleteEntry(idx);
+                        resetLockTimer();
+                    });
+                });
+            }
+
+            let clipboardTimer = null;
+            async function copyPassword(idx) {
+                await navigator.clipboard.writeText(vaultData[idx].password);
+                showToast('✅ Password copied (clears in 10s)');
+                if (clipboardTimer) clearTimeout(clipboardTimer);
+                clipboardTimer = setTimeout(async () => {
+                    await navigator.clipboard.writeText('');
+                    showToast('🧹 Clipboard cleared');
+                }, 10000);
+            }
+
+            function editEntry(idx) {
+                const e = vaultData[idx];
+                document.getElementById('formTitle').textContent = 'Edit Entry';
+                document.getElementById('editIndex').value = idx;
+                document.getElementById('entryTitle').value = e.title || '';
+                document.getElementById('entryUsername').value = e.username || '';
+                document.getElementById('entryPassword').value = e.password || '';
+                document.getElementById('entryNotes').value = e.notes || '';
+                addEditSection.style.display = 'block';
+                updateStrengthMeter(e.password);
+                resetLockTimer();
+            }
+
+            async function deleteEntry(idx) {
+                if (!confirm('Delete this entry?')) return;
+                secureWipe(vaultData[idx]);
+                vaultData.splice(idx, 1);
+                const encrypted = await encryptData(vaultData, masterKey);
+                await saveToStorage(encrypted);
+                renderPasswordList();
+                resetLockTimer();
+            }
+
+            // ==================== PASSWORD STRENGTH ====================
+            function updateStrengthMeter(pwd) {
+                const bar = document.getElementById('strengthBar');
+                bar.className = 'strength-fill';
+                if (!pwd) { bar.style.width = '0%'; return; }
+                let score = 0;
+                if (pwd.length >= 12) score += 2; else if (pwd.length >= 8) score += 1;
+                if (/[a-z]/.test(pwd)) score++;
+                if (/[A-Z]/.test(pwd)) score++;
+                if (/[0-9]/.test(pwd)) score++;
+                if (/[^a-zA-Z0-9]/.test(pwd)) score += 2;
+                if (score <= 2) bar.classList.add('weak');
+                else if (score <= 4) bar.classList.add('medium');
+                else if (score <= 6) bar.classList.add('strong');
+                else bar.classList.add('very-strong');
+            }
+
+            // ==================== EVENT LISTENERS ====================
+            document.getElementById('toggleMasterPassword').addEventListener('click', () => {
+                const inp = document.getElementById('masterPassword');
+                inp.type = inp.type === 'password' ? 'text' : 'password';
+            });
+            document.getElementById('toggleEntryPassword').addEventListener('click', () => {
+                const inp = document.getElementById('entryPassword');
+                inp.type = inp.type === 'password' ? 'text' : 'password';
+            });
+
+            unlockBtn.addEventListener('click', async () => {
+                if (lockoutUntil && Date.now() < lockoutUntil) {
+                    const sec = Math.ceil((lockoutUntil - Date.now())/1000);
+                    return alert(`Too many attempts. Try again in ${sec} seconds.`);
+                }
+
+                const pwd = document.getElementById('masterPassword').value;
+                if (!pwd) return alert('Enter master password');
+                
+                unlockBtn.disabled = true;
+                unlockSpinner.style.display = 'block';
+
+                const stored = await loadFromStorage();
+                if (!stored) {
+                    // First time: show confirm field and warning
+                    if (document.getElementById('confirmPasswordGroup').style.display === 'none') {
+                        document.getElementById('confirmPasswordGroup').style.display = 'block';
+                        unlockBtn.disabled = false;
+                        unlockSpinner.style.display = 'none';
+                        return;
+                    }
+                    const confirmPwd = document.getElementById('confirmMasterPassword').value;
+                    if (pwd !== confirmPwd) {
+                        alert('Passwords do not match');
+                        unlockBtn.disabled = false;
+                        unlockSpinner.style.display = 'none';
+                        return;
+                    }
+                    pendingMasterPassword = pwd;
+                    warningModal.style.display = 'flex';
+                    unlockBtn.disabled = false;
+                    unlockSpinner.style.display = 'none';
+                } else {
+                    const success = await unlockVault(pwd);
+                    if (!success) {
+                        failedAttempts++;
+                        if (failedAttempts >= 5) {
+                            lockoutUntil = Date.now() + 30000;
+                            failedAttempts = 0;
+                            alert('Too many failed attempts. Locked for 30 seconds.');
+                        } else {
+                            alert(`Incorrect password. ${5 - failedAttempts} attempts remaining.`);
+                        }
+                        unlockBtn.disabled = false;
+                        unlockSpinner.style.display = 'none';
+                        return;
+                    }
+                    failedAttempts = 0;
+                    isUnlocked = true;
+                    unlockSection.style.display = 'none';
+                    vaultSection.style.display = 'block';
+                    lockStatus.innerHTML = '<span>🔓</span> Unlocked';
+                    renderPasswordList();
+                    resetLockTimer();
+                    unlockBtn.disabled = false;
+                    unlockSpinner.style.display = 'none';
+                    document.getElementById('masterPassword').value = '';
+                    document.getElementById('confirmPasswordGroup').style.display = 'none';
+                }
+            });
+
+            document.getElementById('confirmWarningBtn').addEventListener('click', async () => {
+                warningModal.style.display = 'none';
+                if (pendingMasterPassword) {
+                    await initializeVault(pendingMasterPassword);
+                    masterKey = await deriveKey(pendingMasterPassword, storageSalt);
+                    isUnlocked = true;
+                    unlockSection.style.display = 'none';
+                    vaultSection.style.display = 'block';
+                    lockStatus.innerHTML = '<span>🔓</span> Unlocked';
+                    renderPasswordList();
+                    resetLockTimer();
+                    pendingMasterPassword = null;
+                    document.getElementById('masterPassword').value = '';
+                    document.getElementById('confirmMasterPassword').value = '';
+                    document.getElementById('confirmPasswordGroup').style.display = 'none';
+                }
+            });
+
+            document.getElementById('cancelWarningBtn').addEventListener('click', () => {
+                warningModal.style.display = 'none';
+                pendingMasterPassword = null;
+            });
+
+            document.getElementById('lockNowBtn').addEventListener('click', () => lockVault());
+            document.getElementById('addNewBtn').addEventListener('click', () => {
+                document.getElementById('formTitle').textContent = 'Add New Entry';
+                document.getElementById('editIndex').value = '-1';
+                document.getElementById('entryTitle').value = '';
+                document.getElementById('entryUsername').value = '';
+                document.getElementById('entryPassword').value = '';
+                document.getElementById('entryNotes').value = '';
+                addEditSection.style.display = 'block';
+                updateStrengthMeter('');
+                resetLockTimer();
+            });
+            document.getElementById('cancelEntryBtn').addEventListener('click', () => {
+                addEditSection.style.display = 'none';
+                resetLockTimer();
+            });
+            document.getElementById('saveEntryBtn').addEventListener('click', async () => {
+                const idx = document.getElementById('editIndex').value;
+                const entry = {
+                    title: document.getElementById('entryTitle').value,
+                    username: document.getElementById('entryUsername').value,
+                    password: document.getElementById('entryPassword').value,
+                    notes: document.getElementById('entryNotes').value,
+                };
+                if (idx === '-1') vaultData.push(entry);
+                else vaultData[idx] = entry;
+                const encrypted = await encryptData(vaultData, masterKey);
+                await saveToStorage(encrypted);
+                addEditSection.style.display = 'none';
+                renderPasswordList();
+                resetLockTimer();
+            });
+            document.getElementById('generatePwBtn').addEventListener('click', () => {
+                document.getElementById('entryPassword').value = generateSecurePassword(20);
+                updateStrengthMeter(document.getElementById('entryPassword').value);
+            });
+            document.getElementById('entryPassword').addEventListener('input', (e) => updateStrengthMeter(e.target.value));
+            searchInput.addEventListener('input', () => { renderPasswordList(); resetLockTimer(); });
+
+            // Export/Import
+            document.getElementById('exportBtn').addEventListener('click', async () => {
+                const salt = arrayBufferToBase64(storageSalt);
+                const data = (await loadFromStorage());
+                const blob = new Blob([JSON.stringify({version: STORAGE_VERSION, salt, data})], {type: 'application/json'});
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url; a.download = `ciphervault_backup_${Date.now()}.json`; a.click();
+                resetLockTimer();
+            });
+            document.getElementById('importBtn').addEventListener('click', () => document.getElementById('importFile').click());
+            document.getElementById('importFile').addEventListener('change', async (e) => {
+                const file = e.target.files[0]; if (!file) return;
+                const text = await file.text();
+                const imported = JSON.parse(text);
+                if (imported.version !== STORAGE_VERSION) return alert('Incompatible backup version');
+                const saltBuffer = base64ToArrayBuffer(imported.salt);
+                const tx = db.transaction(STORE_NAME, 'readwrite');
+                const store = tx.objectStore(STORE_NAME);
+                store.put(imported.data, 'encrypted');
+                store.put(imported.salt, 'salt');
+                await tx.complete;
+                storageSalt = saltBuffer;
+                alert('Backup imported. Please unlock.');
+                location.reload();
+            });
+
+            // Theme Toggle
+            function setTheme(theme) {
+                currentTheme = theme;
+                document.body.classList.toggle('light-mode', theme === 'light');
+                themeToggle.textContent = theme === 'light' ? '☀️' : '🌙';
+                localStorage.setItem('ciphervault_theme', theme);
+            }
+            themeToggle.addEventListener('click', () => setTheme(currentTheme === 'dark' ? 'light' : 'dark'));
+            setTheme(localStorage.getItem('ciphervault_theme') || 'dark');
+
+            // Visibility & Activity Tracking
+            document.addEventListener("visibilitychange", () => { if (document.hidden && isUnlocked) lockVault(true); });
+            ['click', 'keydown', 'scroll', 'mousemove', 'touchstart'].forEach(evt => {
+                document.addEventListener(evt, () => { if (isUnlocked) resetLockTimer(); });
+            });
+
+            // Initialize DB on load
+            openDB();
+        })();
+    </script>
+</body>
+</html>
